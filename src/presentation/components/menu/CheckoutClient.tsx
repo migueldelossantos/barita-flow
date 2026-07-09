@@ -8,12 +8,12 @@ import { buildOrderWhatsAppMessage, getWhatsAppUrl } from "@/lib/whatsapp";
 import { menuRepository } from "@/infrastructure/repositories/menu-repository";
 import { orderRepository } from "@/infrastructure/repositories/order-repository";
 import { useOrderSession } from "@/presentation/stores/order-session-store";
-import { ArrowLeft, Copy, MapPin } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, Copy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "../ui/Button";
 import { FloatingBar } from "../ui/FloatingBar";
+import GoogleMapsComponent from '@/presentation/components/menu/MapLocation'
 
 interface CheckoutClientProps {
   company: CompanyWithProfile;
@@ -33,6 +33,16 @@ export function CheckoutClient({ company }: CheckoutClientProps) {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [into, setInto] = useState(true);
+
+  const [coords, setCoords] = useState<google.maps.LatLngLiteral>();
+  const handleCoords = (coords: google.maps.LatLngLiteral, indoor?: Boolean) => {
+    setCoords(coords);
+    setInto(!!indoor);
+    if (!indoor) {
+      alert("Lo sentimos, tu ubicación actual está fuera de nuestra zona de servicio.");
+    }
+  };
 
   const subtotal = cartTotal();
   const discount = checkout.discountAmount;
@@ -81,8 +91,8 @@ export function CheckoutClient({ company }: CheckoutClientProps) {
       customerPhone: checkout.customerPhone,
       customerAddress:
         deliveryMethod === "delivery" ? checkout.address : undefined,
-      customerLat: checkout.lat,
-      customerLng: checkout.lng,
+      customerLat: coords?.lat,
+      customerLng: coords?.lng,
       paymentMethod: checkout.paymentMethod,
       cashAmount:
         checkout.paymentMethod === "cash"
@@ -209,15 +219,7 @@ export function CheckoutClient({ company }: CheckoutClientProps) {
                     placeholder="Calle, número, colonia..."
                   />
                 </div>
-                <a
-                  href={mapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-brand-blue"
-                >
-                  <MapPin className="h-4 w-4" />
-                  Seleccionar en el mapa
-                </a>
+                <GoogleMapsComponent onLocationChange={handleCoords}/>
               </>
             ) : (
               <>
@@ -227,15 +229,7 @@ export function CheckoutClient({ company }: CheckoutClientProps) {
                 <p className="font-medium">
                   {company.profile?.address ?? "Dirección no configurada"}
                 </p>
-                <a
-                  href={mapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg border border-brand-blue px-4 py-2 text-sm text-brand-blue"
-                >
-                  <MapPin className="h-4 w-4" />
-                  Ver en mapa
-                </a>
+                <GoogleMapsComponent onLocationChange={handleCoords} useLocation={false}/>
               </>
             )}
           </div>
@@ -378,7 +372,7 @@ export function CheckoutClient({ company }: CheckoutClientProps) {
           if (step < 3) setStep(step + 1);
           else handleSubmit();
         }}
-        variant={step === 3 ? "blue" : "green"}
+        variant={step === 3 ? "blue" : into ? "green" : "ghost"}
       />
     </div>
   );

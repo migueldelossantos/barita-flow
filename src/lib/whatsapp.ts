@@ -33,7 +33,7 @@ function buildItemsList(items: CartItem[]): string {
         : "";
       return `• ${item.quantity}x ${item.productName}${extras ? ` (${extras})` : ""}${comment}`;
     })
-    .join("\n");
+    .join("\%0D\%0A");
 }
 
 export function buildOrderWhatsAppMessage(params: WhatsAppMessageParams): string {

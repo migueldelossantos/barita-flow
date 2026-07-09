@@ -1,5 +1,4 @@
 import { SuccessPageClient } from "@/presentation/components/menu/SuccessPageClient";
-import { useEffect } from "react";
 
 interface PageProps {
   params: Promise<{ companyId: string }>;

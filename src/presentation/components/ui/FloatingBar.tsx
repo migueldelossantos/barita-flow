@@ -6,7 +6,7 @@ interface FloatingBarProps {
   amount: string;
   actionLabel: string;
   onAction: () => void;
-  variant?: "green" | "blue";
+  variant?: "green" | "blue" | "ghost";
   className?: string;
 }
 
@@ -32,6 +32,7 @@ export function FloatingBar({
           fullWidth
           onClick={onAction}
           className="flex-1 font-semibold uppercase tracking-wide"
+          disabled={variant === "ghost"}
         >
           {amount} | {actionLabel}
         </Button>

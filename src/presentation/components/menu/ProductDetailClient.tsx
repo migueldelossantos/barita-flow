@@ -107,14 +107,17 @@ export function ProductDetailClient({
       const target = prev.find((t) => t.id === id);
       if (!target) return prev;
 
-      // Validación opcional de maxSelectable para evitar exceder el límite en checkboxes
       const grupoSeleccionados = prev.filter(
         (t) => t.variantId === target.variantId && t.isSelected && t.mode !== "locked"
       ).length;
 
       if (!target.isSelected && grupoSeleccionados >= target.maxSelectable) {
         alert(`Límite alcanzado. Solo puedes seleccionar hasta ${target.maxSelectable} opciones.`);
-        return prev;
+        return prev.map((t) => 
+          t.id === id
+            ? { ...t, isSelected: false }
+            : t
+        );
       }
 
       return prev.map((t) =>
@@ -150,7 +153,6 @@ export function ProductDetailClient({
   };
 
   const handleAdd = () => {
-    // Si tiene variante, guardamos el formato compuesto del producto en la orden
     const finalProductName = hasVariants 
       ? `${product.name} (${selectedVariant.name})` 
       : product.name;
@@ -167,7 +169,6 @@ export function ProductDetailClient({
       productName: finalProductName,
       unitPrice,
       quantity,
-      // Solo enviamos los toppings que están visibles y seleccionados de la variante activa
       toppings: currentToppingsVisibles.filter((t) => t.isSelected),
       addons: [],
       specialInstructions: instructions,

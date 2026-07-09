@@ -78,7 +78,7 @@ export const useOrderSession = create<OrderSessionState>()(
           cart: state.cart.filter((c) => c.id !== id),
         })),
 
-      clearCart: () => set({ cart: [], orderStatus: "open" }),
+      clearCart: () => set({ cart: [], orderStatus: "open", deliveryMethod: null, checkout: defaultCheckout }),
 
       setCheckout: (data) =>
         set((state) => ({

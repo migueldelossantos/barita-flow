@@ -37,9 +37,10 @@ export default async function ProductPage({ params }: PageProps) {
     .from("product_addons")
     .select("addon_product_id")
     .eq("product_id", productId);
+  
+  let addonProducts: any[] = [];
 
-  let addonProducts: Record<string, unknown>[] = [];
-  if (addonLinks?.length) {
+  if (addonLinks && addonLinks?.length) {
     const { data: addons } = await supabase
       .from("products")
       .select("*")
@@ -47,7 +48,7 @@ export default async function ProductPage({ params }: PageProps) {
         "id",
         addonLinks.map((a) => a.addon_product_id)
       );
-    addonProducts = addons ?? [];
+    if (addons) addonProducts = addons;
   }
 
   const cat = product.categories as Record<string, unknown> | null;
