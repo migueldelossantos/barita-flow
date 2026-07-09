@@ -7,24 +7,34 @@ import { formatOrderNumber } from "@/lib/format";
 import { printOrderTicket } from "@/lib/print-ticket";
 import { createClient } from "@/infrastructure/supabase/client";
 import { useCompany } from "@/presentation/providers/CompanyProvider";
-import { ArrowRight, Eye, Printer } from "lucide-react";
+import { ArrowRight, Eye, Plus, Printer } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import PaginationControls from "@/presentation/components/ui/PaginatorComponent";
+import { usePagination } from "@/presentation/hooks/usePagination";
+import { Button } from "../ui/Button";
 import {
   OrderDetailModal,
   type OrderDetail,
 } from "./OrderDetailModal";
 
 function nextStatus(current: OrderStatus): OrderStatus | null {
-  const i = ORDER_STATUS_SEQUENCE.indexOf(current);
-  if (i < 0 || i >= ORDER_STATUS_SEQUENCE.length - 1) return null;
-  return ORDER_STATUS_SEQUENCE[i + 1];
+  const index = ORDER_STATUS_SEQUENCE.indexOf(current);
+  if (index < 0 || index >= ORDER_STATUS_SEQUENCE.length - 1) return null;
+  return ORDER_STATUS_SEQUENCE[index + 1];
 }
 
 export function OrdersAdminClient() {
+  const router = useRouter();
   const { companyId, company, loading: ctxLoading } = useCompany();
   const [orders, setOrders] = useState<OrderDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<OrderDetail | null>(null);
+
+  const { currentData, currentPage, totalPages, setCurrentPage } = usePagination(
+    orders,
+    10
+  );
 
   const load = useCallback(async () => {
     if (!companyId) return;
@@ -38,35 +48,35 @@ export function OrdersAdminClient() {
       .order("created_at", { ascending: false });
 
     const full: OrderDetail[] = await Promise.all(
-      (rows ?? []).map(async (o) => {
+      (rows ?? []).map(async (order) => {
         const { data: items } = await supabase
           .from("order_items")
           .select("*")
-          .eq("order_id", o.id);
+          .eq("order_id", order.id);
 
         return {
-          id: o.id,
-          orderNumber: o.order_number,
-          status: o.status,
-          deliveryMethod: o.delivery_method,
-          customerName: o.customer_name,
-          customerPhone: o.customer_phone,
-          customerAddress: o.customer_address,
-          paymentMethod: o.payment_method,
-          cashAmount: o.cash_amount ? Number(o.cash_amount) : null,
-          subtotal: Number(o.subtotal),
-          discountAmount: Number(o.discount_amount),
-          total: Number(o.total),
-          comments: o.comments,
-          couponCode: o.coupon_code,
-          createdAt: o.created_at,
-          items: (items ?? []).map((i) => ({
-            productName: i.product_name,
-            quantity: i.quantity,
-            unitPrice: Number(i.unit_price),
-            lineTotal: Number(i.line_total),
-            specialInstructions: i.special_instructions,
-            configuration: i.configuration as Record<string, unknown>,
+          id: order.id,
+          orderNumber: order.order_number,
+          status: order.status,
+          deliveryMethod: order.delivery_method,
+          customerName: order.customer_name,
+          customerPhone: order.customer_phone,
+          customerAddress: order.customer_address,
+          paymentMethod: order.payment_method,
+          cashAmount: order.cash_amount ? Number(order.cash_amount) : null,
+          subtotal: Number(order.subtotal),
+          discountAmount: Number(order.discount_amount),
+          total: Number(order.total),
+          comments: order.comments,
+          couponCode: order.coupon_code,
+          createdAt: order.created_at,
+          items: (items ?? []).map((item) => ({
+            productName: item.product_name,
+            quantity: item.quantity,
+            unitPrice: Number(item.unit_price),
+            lineTotal: Number(item.line_total),
+            specialInstructions: item.special_instructions,
+            configuration: item.configuration as Record<string, unknown>,
           })),
         };
       })
@@ -96,6 +106,7 @@ export function OrdersAdminClient() {
         () => load()
       )
       .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -114,16 +125,26 @@ export function OrdersAdminClient() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Órdenes</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">Ordenes</h1>
+        <Button
+          type="button"
+          variant="blue"
+          onClick={() => router.push("/admin/dashboard/orders/new")}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Nueva orden
+        </Button>
+      </div>
 
       <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
         <table className="w-full text-left text-sm">
           <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
             <tr>
-              <th className="px-4 py-3">Número</th>
+              <th className="px-4 py-3">Numero</th>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Cliente</th>
-              <th className="px-4 py-3">Teléfono</th>
+              <th className="px-4 py-3">Telefono</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr>
@@ -135,26 +156,26 @@ export function OrdersAdminClient() {
                   Cargando...
                 </td>
               </tr>
-            ) : orders.length === 0 ? (
+            ) : currentData.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                   Sin pedidos
                 </td>
               </tr>
             ) : (
-              orders.map((o) => (
-                <tr key={o.id} className="border-b">
+              currentData.map((order) => (
+                <tr key={order.id} className="border-b">
                   <td className="px-4 py-3 font-mono">
-                    {formatOrderNumber(o.orderNumber)}
+                    {formatOrderNumber(order.orderNumber)}
                   </td>
                   <td className="px-4 py-3">
-                    {new Date(o.createdAt).toLocaleDateString("es-MX")}
+                    {new Date(order.createdAt).toLocaleDateString("es-MX")}
                   </td>
-                  <td className="px-4 py-3">{o.customerName ?? "—"}</td>
-                  <td className="px-4 py-3">{o.customerPhone ?? "—"}</td>
+                  <td className="px-4 py-3">{order.customerName ?? "—"}</td>
+                  <td className="px-4 py-3">{order.customerPhone ?? "—"}</td>
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-brand-green/10 px-2 py-0.5 text-xs font-medium text-brand-green">
-                      {ORDER_STATUS_LABELS[o.status]}
+                      {ORDER_STATUS_LABELS[order.status]}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -164,7 +185,7 @@ export function OrdersAdminClient() {
                         className="p-1 hover:text-gray-800"
                         title="Imprimir ticket"
                         onClick={() =>
-                          printOrderTicket(o, company?.name ?? "Negocio")
+                          printOrderTicket(order, company?.name ?? "Negocio")
                         }
                       >
                         <Printer className="h-4 w-4" />
@@ -172,16 +193,16 @@ export function OrdersAdminClient() {
                       <button
                         type="button"
                         className="p-1 hover:text-brand-blue"
-                        onClick={() => setDetail(o)}
+                        onClick={() => setDetail(order)}
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      {nextStatus(o.status) && (
+                      {nextStatus(order.status) && (
                         <button
                           type="button"
                           className="p-1 hover:text-brand-green"
                           title="Avanzar pedido"
-                          onClick={() => handleAdvance(o)}
+                          onClick={() => handleAdvance(order)}
                         >
                           <ArrowRight className="h-4 w-4" />
                         </button>
@@ -193,6 +214,12 @@ export function OrdersAdminClient() {
             )}
           </tbody>
         </table>
+
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       <OrderDetailModal
