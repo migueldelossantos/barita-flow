@@ -1,9 +1,19 @@
 "use server";
 
+import type { DeliveryMethod, PaymentMethod, ToppingMode } from "@/domain/enums";
 import { createServerSupabaseClient } from "@/infrastructure/supabase/server";
-import type { ToppingMode } from "@/domain/enums";
+import { formatCurrency } from "@/lib/format";
 import { generateProductCode } from "@/lib/product-code";
 import { revalidatePath } from "next/cache";
+
+import { exec } from "child_process";
+import { promisify } from "util";
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
+import { CartToppingSelection } from "@/domain/entities/order";
+
+const execAsync = promisify(exec);
 
 export interface VariantInput {
   id?: string,
@@ -27,6 +37,65 @@ export interface ProductInput {
   isActive: boolean;
   variants: VariantInput[]
   toppings: ToppingInput[];
+}
+
+export interface CouponInput {
+  id?: string;
+  code: string;
+  discountType: "percent" | "amount";
+  discountValue: number;
+  isActive: boolean;
+  expiresAt: string | null;
+  productIds: string[];
+}
+
+export interface ThermalTicketItem {
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal?: number;
+  specialInstructions?: string | null;
+  toppings: CartToppingSelection[];
+}
+
+export interface PrintThermalTicketInput {
+  companyName: string;
+  orderNumber: number;
+  deliveryMethod: DeliveryMethod;
+  customerName: string;
+  customerPhone: string;
+  customerAddress?: string | null;
+  paymentMethod: PaymentMethod;
+  cashAmount?: number | null;
+  subtotal: number;
+  discountAmount: number;
+  total: number;
+  comments?: string | null;
+  items: ThermalTicketItem[];
+}
+
+class BufferAdapter {
+  public buffer: Buffer;
+
+  constructor() {
+    this.buffer = Buffer.alloc(0);
+  }
+
+  open(callback?: (error: any) => void) {
+    if (callback) callback(null);
+    return this;
+  }
+
+  write(data: Buffer, callback?: (error: any) => void) {
+    this.buffer = Buffer.concat([this.buffer, data]);
+    if (callback) callback(null);
+    return this;
+  }
+
+  close(callback?: (error: any) => void) {
+    if (callback) callback(null);
+    return this;
+  }
 }
 
 async function getMemberCompanyId() {
@@ -262,6 +331,191 @@ export async function advanceOrderStatus(
     .eq("company_id", companyId);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/dashboard/orders");
+}
+
+export async function saveCoupon(
+  companyId: string,
+  data: CouponInput
+) {
+  const { supabase } = await getMemberCompanyId();
+  const code = data.code.trim().toUpperCase();
+
+  if (!code) throw new Error("El codigo del cupon es obligatorio");
+  if (data.discountType === "percent" && (data.discountValue <= 0 || data.discountValue > 100)) {
+    throw new Error("El porcentaje debe estar entre 1 y 100");
+  }
+  if (data.discountType === "amount" && data.discountValue <= 0) {
+    throw new Error("El monto de descuento debe ser mayor a 0");
+  }
+
+  const couponPayload = {
+    company_id: companyId,
+    code,
+    discount_percent: data.discountType === "percent" ? data.discountValue : null,
+    discount_amount: data.discountType === "amount" ? data.discountValue : null,
+    is_active: data.isActive,
+    expires_at: data.expiresAt || null,
+  };
+
+  let couponId = data.id ?? null;
+
+  if (couponId) {
+    const { error } = await supabase
+      .from("coupons")
+      .update(couponPayload)
+      .eq("id", couponId)
+      .eq("company_id", companyId);
+    if (error) throw new Error(error.message);
+  } else {
+    const { data: created, error } = await supabase
+      .from("coupons")
+      .insert(couponPayload)
+      .select("id")
+      .single();
+    if (error || !created) throw new Error(error?.message ?? "Error al crear cupon");
+    couponId = created.id;
+  }
+
+  if (!couponId) throw new Error("No se pudo guardar el cupon");
+
+  await supabase.from("coupon_products").delete().eq("coupon_id", couponId);
+
+  if (data.productIds.length > 0) {
+    const rows = data.productIds.map((productId) => ({
+      coupon_id: couponId,
+      product_id: productId,
+    }));
+    const { error } = await supabase.from("coupon_products").insert(rows);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/admin/dashboard/promotions");
+}
+
+export async function deleteCoupon(companyId: string, couponId: string) {
+  const { supabase } = await getMemberCompanyId();
+  const { error } = await supabase
+    .from("coupons")
+    .delete()
+    .eq("id", couponId)
+    .eq("company_id", companyId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/dashboard/promotions");
+}
+
+function wrapText(text: string, limit = 32) {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [""];
+
+  const lines: string[] = [];
+  let currentLine = words[0];
+
+  for (const word of words.slice(1)) {
+    if ((currentLine + " " + word).length <= limit) {
+      currentLine += " " + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+
+  lines.push(currentLine);
+  return lines;
+}
+
+function formatTicketLine(left: string, right: string, width = 32) {
+  const trimmedLeft = left.trim();
+  const trimmedRight = right.trim();
+  const available = Math.max(1, width - trimmedRight.length - 1);
+  const label = trimmedLeft.length > available
+    ? `${trimmedLeft.slice(0, Math.max(0, available - 3)).trimEnd()}...`
+    : trimmedLeft;
+  return `${label.padEnd(width - trimmedRight.length - 1)} ${trimmedRight}`;
+}
+
+export async function printThermalTicket(data: PrintThermalTicketInput) {
+
+  const escpos = eval("require('escpos')");
+  const device = new BufferAdapter();
+  const options = { encoding: "GB18030" };
+  const printer = new escpos.Printer(device, options);
+
+  const lines: string[] = [];
+  lines.push(data.companyName.toUpperCase());
+  lines.push(`PEDIDO #${data.orderNumber}`);
+  lines.push(new Date().toLocaleString("es-MX"));
+  lines.push("--------------------------------");
+  lines.push(`Cliente: ${data.customerName}`);
+  lines.push(`Telefono: ${data.customerPhone}`);
+  lines.push(`Entrega: ${data.deliveryMethod}`);
+  if (data.customerAddress) lines.push(`Direccion: ${data.customerAddress}`);
+  lines.push("--------------------------------");
+  lines.push("ARTICULOS");
+
+  for (const item of data.items) {
+    const lineTotal = typeof item.lineTotal === "number"
+      ? item.lineTotal
+      : item.unitPrice * item.quantity;
+    const itemNameLines = wrapText(`${item.quantity}x ${item.productName}`);
+    lines.push(...itemNameLines);
+    const itemTopping = wrapText(`${item.toppings.filter(i => i.isSelected).reduce((str, value) => { return str += value.name }, '( ')} )`)
+    lines.push(...itemTopping);
+    lines.push(`  ${formatCurrency(lineTotal)}`);
+    if (item.specialInstructions?.trim()) {
+      lines.push(`  Nota: ${item.specialInstructions.trim()}`);
+    }
+  }
+
+  lines.push("--------------------------------");
+  lines.push(formatTicketLine("Subtotal", formatCurrency(data.subtotal)));
+  if (data.discountAmount > 0) {
+    lines.push(formatTicketLine("Descuento", `-${formatCurrency(data.discountAmount)}`));
+  }
+  lines.push(formatTicketLine("Total", formatCurrency(data.total)));
+  lines.push(formatTicketLine("Pago", data.paymentMethod === "cash" ? "Efectivo" : "Transferencia"));
+  if (data.paymentMethod === "cash" && typeof data.cashAmount === "number") {
+    lines.push(formatTicketLine("Recibido", formatCurrency(data.cashAmount)));
+    lines.push(formatTicketLine("Cambio", formatCurrency(Math.max(0, data.cashAmount - data.total))));
+  }
+  if (data.comments?.trim()) {
+    lines.push("--------------------------------");
+    lines.push("Comentarios:");
+    lines.push(...wrapText(data.comments.trim()));
+  }
+  lines.push("--------------------------------");
+  lines.push("Gracias por su compra");
+
+  await new Promise<void>((resolve, reject) => {
+    device.open(async (error: Error | null) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      printer
+        .align("LT")
+        .font("a")
+        .text(lines.join("\n"))
+        .feed(2)
+        .cut()
+        .close();
+
+      // resolve();
+      try {
+        const tempFilePath = path.join(os.tmpdir(), `report_${Date.now()}.bin`);
+        await fs.writeFile(tempFilePath, device.buffer);
+
+        const command = `copy /B "${tempFilePath}" "\\\\localhost\\TICKETS"`;
+        await execAsync(command);
+
+        await fs.unlink(tempFilePath).catch(() => {});
+        resolve();
+      } catch (e: any) {
+        console.error("Error enviando el reporte a la impresora:", e);
+        reject(new Error("No se pudo imprimir el reporte."));
+      }
+    });
+  });
 }
 
 export async function saveCompanyProfile(

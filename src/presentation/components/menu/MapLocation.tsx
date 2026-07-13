@@ -19,6 +19,8 @@ const initialCenter = {
   lng: -96.685361
 };
 
+const GOOGLE_MAPS_LIBRARIES: ("marker" | "geometry" | "places")[] = ["marker", "geometry"];
+
 export default function GoogleMapsComponent ({
     onLocationChange,
     useLocation = true
@@ -26,7 +28,7 @@ export default function GoogleMapsComponent ({
     const { isLoaded, loadError } = useJsApiLoader({
         id: 'google-map-script',
         googleMapsApiKey: process.env.NEXT_PUBLIC_GM_API_KEY!,
-        libraries: ["geometry"]
+        libraries: GOOGLE_MAPS_LIBRARIES
     })
 
     const [map, setMap] = useState<google.maps.Map | null>(null)

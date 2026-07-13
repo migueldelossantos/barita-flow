@@ -63,13 +63,27 @@ export function CheckoutClient({ company }: CheckoutClientProps) {
       alert("Cupón no válido");
       return;
     }
+
+    const eligibleSubtotal =
+      result.allowedProductIds.length === 0
+        ? subtotal
+        : cart.reduce((sum, item) => {
+            if (!result.allowedProductIds.includes(item.productId)) return sum;
+            return sum + item.unitPrice * item.quantity;
+          }, 0);
+
+    if (eligibleSubtotal <= 0) {
+      alert("Este cupón no aplica a los productos que tienes en el carrito");
+      return;
+    }
+
     let amount = 0;
     if (result.discountPercent) {
-      amount = subtotal * (result.discountPercent / 100);
+      amount = eligibleSubtotal * (result.discountPercent / 100);
     } else if (result.discountAmount) {
-      amount = result.discountAmount;
+      amount = Math.min(result.discountAmount, eligibleSubtotal);
     }
-    setCheckout({ discountAmount: amount });
+    setCheckout({ discountAmount: Math.min(amount, subtotal) });
   };
 
   const copyClabe = () => {

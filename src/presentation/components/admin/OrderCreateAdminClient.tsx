@@ -3,6 +3,7 @@
 import type { CartItem } from "@/domain/entities/order";
 import type { Product, ProductTopping, ProductVariant } from "@/domain/entities/product";
 import { type DeliveryMethod, DELIVERY_METHOD_LABELS, type PaymentMethod } from "@/domain/enums";
+import { printThermalTicket } from "@/app/actions/admin";
 import { orderRepository } from "@/infrastructure/repositories/order-repository";
 import { createClient } from "@/infrastructure/supabase/client";
 import { cn } from "@/lib/cn";
@@ -356,6 +357,27 @@ export function OrderCreateAdminClient() {
     if (!created) {
       alert("No se pudo registrar la orden");
       return;
+    }
+
+    try {
+      await printThermalTicket({
+        companyName: company?.name ?? "Negocio",
+        orderNumber: created.orderNumber,
+        deliveryMethod,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        customerAddress:
+          deliveryMethod === "delivery" ? customerAddress.trim() : undefined,
+        paymentMethod,
+        cashAmount: paymentMethod === "cash" ? Number(cashAmount) || subtotal : null,
+        subtotal,
+        discountAmount: 0,
+        total: subtotal,
+        items: items.map(buildCartItem),
+      });
+    } catch (error) {
+      console.error("printThermalTicket error:", error);
+      alert("La orden se guardó, pero no se pudo imprimir el ticket.");
     }
 
     router.replace("/admin/dashboard/orders");

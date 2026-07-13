@@ -173,10 +173,10 @@ export class MenuRepository {
   async validateCoupon(
     companyId: string,
     code: string
-  ): Promise<{ discountPercent?: number; discountAmount?: number } | null> {
+  ): Promise<{ discountPercent?: number; discountAmount?: number; allowedProductIds: string[] } | null> {
     const { data } = await this.supabase
       .from("coupons")
-      .select("*")
+      .select("id, discount_percent, discount_amount, expires_at")
       .eq("company_id", companyId)
       .eq("code", code.toUpperCase())
       .eq("is_active", true)
@@ -185,6 +185,11 @@ export class MenuRepository {
     if (!data) return null;
     if (data.expires_at && new Date(data.expires_at) < new Date()) return null;
 
+    const { data: productRows } = await this.supabase
+      .from("coupon_products")
+      .select("product_id")
+      .eq("coupon_id", data.id);
+
     return {
       discountPercent: data.discount_percent
         ? Number(data.discount_percent)
@@ -192,6 +197,7 @@ export class MenuRepository {
       discountAmount: data.discount_amount
         ? Number(data.discount_amount)
         : undefined,
+      allowedProductIds: (productRows ?? []).map((row) => row.product_id as string),
     };
   }
 }

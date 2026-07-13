@@ -9,7 +9,7 @@ export default function HomePage() {
         enlace único.
       </p>
       <Link
-        href="/menu/00000000-0000-4000-8000-000000000001"
+        href="/menu/af605a6c-60dd-486b-8a61-a168533cd726"
         className="rounded-lg bg-brand-green px-6 py-3 font-medium text-white hover:bg-brand-green-dark"
       >
         Ver menú demo

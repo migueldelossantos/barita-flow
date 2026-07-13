@@ -6,14 +6,17 @@ const ERROR_MESSAGES: Record<string, string> = {
   config: "Faltan variables NEXT_PUBLIC_SUPABASE_URL o ANON_KEY en .env.local",
 };
 
-export default function AdminLoginPage({
+interface PageProps {
+  searchParams: Promise<{ error?: string; message?: string }>;
+}
+
+export default async function AdminLoginPage({
   searchParams,
-}: {
-  searchParams: { error?: string; message?: string };
-}) {
-  const errorKey = searchParams.error;
+}: PageProps) {
+  const resolvedSearchParams = await searchParams;
+  const errorKey = resolvedSearchParams.error;
   const errorText =
-    searchParams.message ??
+    resolvedSearchParams.message ??
     (errorKey ? ERROR_MESSAGES[errorKey] : null);
 
   const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(
