@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ["escpos", "escpos-usb", "usb"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**.supabase.co" },
