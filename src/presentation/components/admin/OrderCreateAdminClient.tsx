@@ -360,8 +360,14 @@ export function OrderCreateAdminClient() {
     }
 
     try {
+      const menuUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/menu/${companyId}`
+          : `/menu/${companyId}`;
+
       await printThermalTicket({
         companyName: company?.name ?? "Negocio",
+        menuUrl,
         orderNumber: created.orderNumber,
         deliveryMethod,
         customerName: customerName.trim(),

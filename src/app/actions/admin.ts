@@ -5,15 +5,7 @@ import { createServerSupabaseClient } from "@/infrastructure/supabase/server";
 import { formatCurrency } from "@/lib/format";
 import { generateProductCode } from "@/lib/product-code";
 import { revalidatePath } from "next/cache";
-
-import { exec } from "child_process";
-import { promisify } from "util";
-import fs from "fs/promises";
-import path from "path";
-import os from "os";
-import { CartToppingSelection } from "@/domain/entities/order";
-
-const execAsync = promisify(exec);
+import type { CartToppingSelection } from "@/domain/entities/order";
 
 export interface VariantInput {
   id?: string,
@@ -60,6 +52,7 @@ export interface ThermalTicketItem {
 
 export interface PrintThermalTicketInput {
   companyName: string;
+  menuUrl: string;
   orderNumber: number;
   deliveryMethod: DeliveryMethod;
   customerName: string;
@@ -72,30 +65,6 @@ export interface PrintThermalTicketInput {
   total: number;
   comments?: string | null;
   items: ThermalTicketItem[];
-}
-
-class BufferAdapter {
-  public buffer: Buffer;
-
-  constructor() {
-    this.buffer = Buffer.alloc(0);
-  }
-
-  open(callback?: (error: any) => void) {
-    if (callback) callback(null);
-    return this;
-  }
-
-  write(data: Buffer, callback?: (error: any) => void) {
-    this.buffer = Buffer.concat([this.buffer, data]);
-    if (callback) callback(null);
-    return this;
-  }
-
-  close(callback?: (error: any) => void) {
-    if (callback) callback(null);
-    return this;
-  }
 }
 
 async function getMemberCompanyId() {
@@ -434,11 +403,20 @@ function formatTicketLine(left: string, right: string, width = 32) {
 }
 
 export async function printThermalTicket(data: PrintThermalTicketInput) {
+  const vendorId = Number(process.env.ESC_POS_USB_VENDOR_ID);
+  const productId = Number(process.env.ESC_POS_USB_PRODUCT_ID);
 
-  const escpos = eval("require('escpos')");
-  const device = new BufferAdapter();
-  const options = { encoding: "GB18030" };
-  const printer = new escpos.Printer(device, options);
+  if (!vendorId || !productId) {
+    throw new Error(
+      "Faltan las variables ESC_POS_USB_VENDOR_ID y ESC_POS_USB_PRODUCT_ID"
+    );
+  }
+
+  const escpos = require("escpos");
+  escpos.USB = require("escpos-usb");
+
+  const device = new escpos.USB(vendorId, productId);
+  const printer = new escpos.Printer(device, { encoding: "CP850" });
 
   const lines: string[] = [];
   lines.push(data.companyName.toUpperCase());
@@ -453,16 +431,24 @@ export async function printThermalTicket(data: PrintThermalTicketInput) {
   lines.push("ARTICULOS");
 
   for (const item of data.items) {
-    const lineTotal = typeof item.lineTotal === "number"
-      ? item.lineTotal
-      : item.unitPrice * item.quantity;
-    const itemNameLines = wrapText(`${item.quantity}x ${item.productName}`);
-    lines.push(...itemNameLines);
-    const itemTopping = wrapText(`${item.toppings.filter(i => i.isSelected).reduce((str, value) => { return str += value.name }, '( ')} )`)
-    lines.push(...itemTopping);
+    const lineTotal =
+      typeof item.lineTotal === "number"
+        ? item.lineTotal
+        : item.unitPrice * item.quantity;
+    lines.push(...wrapText(`${item.quantity}x ${item.productName}`));
+
+    const toppingNames = item.toppings
+      .filter((topping) => topping.isSelected)
+      .map((topping) => topping.name)
+      .join(", ");
+    if (toppingNames) {
+      lines.push(...wrapText(`Toppings: ${toppingNames}`));
+    }
+
     lines.push(`  ${formatCurrency(lineTotal)}`);
+
     if (item.specialInstructions?.trim()) {
-      lines.push(`  Nota: ${item.specialInstructions.trim()}`);
+      lines.push(...wrapText(`Nota: ${item.specialInstructions.trim()}`));
     }
   }
 
@@ -472,10 +458,20 @@ export async function printThermalTicket(data: PrintThermalTicketInput) {
     lines.push(formatTicketLine("Descuento", `-${formatCurrency(data.discountAmount)}`));
   }
   lines.push(formatTicketLine("Total", formatCurrency(data.total)));
-  lines.push(formatTicketLine("Pago", data.paymentMethod === "cash" ? "Efectivo" : "Transferencia"));
+  lines.push(
+    formatTicketLine(
+      "Pago",
+      data.paymentMethod === "cash" ? "Efectivo" : "Transferencia"
+    )
+  );
   if (data.paymentMethod === "cash" && typeof data.cashAmount === "number") {
     lines.push(formatTicketLine("Recibido", formatCurrency(data.cashAmount)));
-    lines.push(formatTicketLine("Cambio", formatCurrency(Math.max(0, data.cashAmount - data.total))));
+    lines.push(
+      formatTicketLine(
+        "Cambio",
+        formatCurrency(Math.max(0, data.cashAmount - data.total))
+      )
+    );
   }
   if (data.comments?.trim()) {
     lines.push("--------------------------------");
@@ -483,37 +479,30 @@ export async function printThermalTicket(data: PrintThermalTicketInput) {
     lines.push(...wrapText(data.comments.trim()));
   }
   lines.push("--------------------------------");
-  lines.push("Gracias por su compra");
+  lines.push("Escanea el QR para ver el menu");
 
   await new Promise<void>((resolve, reject) => {
-    device.open(async (error: Error | null) => {
+    device.open((error: Error | null) => {
       if (error) {
         reject(error);
         return;
       }
 
       printer
+        .initialize()
         .align("LT")
         .font("a")
         .text(lines.join("\n"))
-        .feed(2)
-        .cut()
-        .close();
+        .feed(1)
+        .qrimage(data.menuUrl, { type: "png", mode: "dhdw" }, (qrError: Error | null) => {
+          if (qrError) {
+            reject(qrError);
+            return;
+          }
 
-      // resolve();
-      try {
-        const tempFilePath = path.join(os.tmpdir(), `report_${Date.now()}.bin`);
-        await fs.writeFile(tempFilePath, device.buffer);
-
-        const command = `copy /B "${tempFilePath}" "\\\\localhost\\TICKETS"`;
-        await execAsync(command);
-
-        await fs.unlink(tempFilePath).catch(() => {});
-        resolve();
-      } catch (e: any) {
-        console.error("Error enviando el reporte a la impresora:", e);
-        reject(new Error("No se pudo imprimir el reporte."));
-      }
+          printer.feed(1).cut().close();
+          resolve();
+        });
     });
   });
 }
