@@ -79,8 +79,8 @@ function buildTicketHtml(order: TicketOrder, businessName: string, qrDataUrl: st
     @page { size: 56mm auto; margin: 0; }
     html, body { margin: 0; padding: 0; background: #fff; }
     body {
-      width: 50mm;
-      padding: 2mm 0mm;
+      width: 45mm;
+      padding: 4mm 0mm;
       font-family: "Courier New", Courier, monospace;
       font-size: 11px;
       line-height: 1.25;
@@ -89,7 +89,7 @@ function buildTicketHtml(order: TicketOrder, businessName: string, qrDataUrl: st
       print-color-adjust: exact;
       overflow: hidden;
     }
-    .ticket { width: 100%; }
+    .ticket { width: 98%; }
     .center { text-align: center; }
     .title { font-size: 13px; font-weight: 800; margin-bottom: 2px; }
     .subtitle { font-size: 11px; margin-bottom: 3px; }
