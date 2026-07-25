@@ -79,8 +79,8 @@ function buildTicketHtml(order: TicketOrder, businessName: string, qrDataUrl: st
     @page { size: 56mm auto; margin: 0; }
     html, body { margin: 0; padding: 0; background: #fff; }
     body {
-      width: 56mm;
-      padding: 2mm 1mm;
+      width: 54mm;
+      padding: 2mm 0mm;
       font-family: "Courier New", Courier, monospace;
       font-size: 11px;
       line-height: 1.25;
