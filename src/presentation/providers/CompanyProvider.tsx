@@ -132,7 +132,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         licenseType: co.license_type as LicenseType,
         licenseExpiresAt: co.license_expires_at,
         isSetupComplete: co.is_setup_complete,
-        profile: profile
+              profile: profile
           ? {
               companyId: profile.company_id,
               slogan: profile.slogan,
@@ -145,6 +145,9 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
               transferOwnerName: profile.transfer_owner_name,
               transferBank: profile.transfer_bank,
               transferClabe: profile.transfer_clabe,
+              menuEnabled: profile.menu_enabled,
+              menuOpenTime: profile.menu_open_time,
+              menuCloseTime: profile.menu_close_time,
             }
           : null,
       });

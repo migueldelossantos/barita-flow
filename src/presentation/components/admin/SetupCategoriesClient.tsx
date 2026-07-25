@@ -123,6 +123,9 @@ export function SetupCategoriesClient() {
         transferOwnerName: company.profile?.transferOwnerName ?? "",
         transferBank: company.profile?.transferBank ?? "",
         transferClabe: company.profile?.transferClabe ?? "",
+        menuEnabled: company.profile?.menuEnabled ?? true,
+        menuOpenTime: company.profile?.menuOpenTime ?? "",
+        menuCloseTime: company.profile?.menuCloseTime ?? "",
         isSetupComplete: true,
       });
     }

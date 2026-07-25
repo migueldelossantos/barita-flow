@@ -402,6 +402,36 @@ function formatTicketLine(left: string, right: string, width = 32) {
   return `${label.padEnd(width - trimmedRight.length - 1)} ${trimmedRight}`;
 }
 
+async function buildQrImage(menuUrl: string) {
+  const QRCode = require("qrcode");
+  const getPixels = require("get-pixels");
+  const escpos = require("escpos");
+
+  const qrBuffer = await QRCode.toBuffer(menuUrl, {
+    type: "png",
+    width: 280,
+    margin: 1,
+    errorCorrectionLevel: "H",
+    color: {
+      dark: "#000000",
+      light: "#FFFFFF",
+    },
+  });
+
+  const pixels = await new Promise<any>((resolve, reject) => {
+    getPixels(qrBuffer, "image/png", (error: Error | null, imagePixels: any) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(imagePixels);
+    });
+  });
+
+  return new escpos.Image(pixels);
+}
+
 export async function printThermalTicket(data: PrintThermalTicketInput) {
   const vendorId = Number(process.env.ESC_POS_USB_VENDOR_ID);
   const productId = Number(process.env.ESC_POS_USB_PRODUCT_ID);
@@ -416,18 +446,23 @@ export async function printThermalTicket(data: PrintThermalTicketInput) {
   escpos.USB = require("escpos-usb");
 
   const device = new escpos.USB(vendorId, productId);
-  const printer = new escpos.Printer(device, { encoding: "CP850" });
+  const printerWidth = Number(process.env.ESC_POS_PRINTER_WIDTH) || 28;
+  const printer = new escpos.Printer(device, {
+    encoding: "CP850",
+    width: printerWidth,
+  });
+  const separatorLine = "-".repeat(Math.min(printerWidth, 24));
 
   const lines: string[] = [];
   lines.push(data.companyName.toUpperCase());
   lines.push(`PEDIDO #${data.orderNumber}`);
   lines.push(new Date().toLocaleString("es-MX"));
-  lines.push("--------------------------------");
+  lines.push(separatorLine);
   lines.push(`Cliente: ${data.customerName}`);
   lines.push(`Telefono: ${data.customerPhone}`);
   lines.push(`Entrega: ${data.deliveryMethod}`);
   if (data.customerAddress) lines.push(`Direccion: ${data.customerAddress}`);
-  lines.push("--------------------------------");
+  lines.push(separatorLine);
   lines.push("ARTICULOS");
 
   for (const item of data.items) {
@@ -452,7 +487,7 @@ export async function printThermalTicket(data: PrintThermalTicketInput) {
     }
   }
 
-  lines.push("--------------------------------");
+  lines.push(separatorLine);
   lines.push(formatTicketLine("Subtotal", formatCurrency(data.subtotal)));
   if (data.discountAmount > 0) {
     lines.push(formatTicketLine("Descuento", `-${formatCurrency(data.discountAmount)}`));
@@ -474,35 +509,35 @@ export async function printThermalTicket(data: PrintThermalTicketInput) {
     );
   }
   if (data.comments?.trim()) {
-    lines.push("--------------------------------");
+    lines.push(separatorLine);
     lines.push("Comentarios:");
     lines.push(...wrapText(data.comments.trim()));
   }
-  lines.push("--------------------------------");
+  lines.push(separatorLine);
   lines.push("Escanea el QR para ver el menu");
 
   await new Promise<void>((resolve, reject) => {
-    device.open((error: Error | null) => {
+    device.open(async (error: Error | null) => {
       if (error) {
         reject(error);
         return;
       }
 
-      printer
-        .initialize()
-        .align("LT")
-        .font("a")
-        .text(lines.join("\n"))
-        .feed(1)
-        .qrimage(data.menuUrl, { type: "png", mode: "dhdw" }, (qrError: Error | null) => {
-          if (qrError) {
-            reject(qrError);
-            return;
-          }
+      try {
+        printer.initialize().align("LT").font("a");
 
-          printer.feed(1).cut().close();
-          resolve();
-        });
+        for (const line of lines) {
+          printer.text(line);
+        }
+
+        printer.feed(1);
+        const qrImage = await buildQrImage(data.menuUrl);
+        printer.align("CT").raster(qrImage, "normal");
+        printer.feed(2).cut().close();
+        resolve();
+      } catch (printError) {
+        reject(printError);
+      }
     });
   });
 }
@@ -519,6 +554,9 @@ export async function saveCompanyProfile(
     transferOwnerName: string;
     transferBank: string;
     transferClabe: string;
+    menuEnabled: boolean;
+    menuOpenTime: string;
+    menuCloseTime: string;
     isSetupComplete?: boolean;
   }
 ) {
@@ -544,6 +582,9 @@ export async function saveCompanyProfile(
     transfer_owner_name: data.transferOwnerName || null,
     transfer_bank: data.transferBank || null,
     transfer_clabe: data.transferClabe || null,
+    menu_enabled: data.menuEnabled,
+    menu_open_time: data.menuOpenTime || null,
+    menu_close_time: data.menuCloseTime || null,
   };
 
   if (existing) {

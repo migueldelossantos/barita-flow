@@ -30,6 +30,9 @@ function mapCompany(row: Record<string, unknown>, profile: Record<string, unknow
           transferOwnerName: profile.transfer_owner_name as string | null,
           transferBank: profile.transfer_bank as string | null,
           transferClabe: profile.transfer_clabe as string | null,
+          menuEnabled: profile.menu_enabled as boolean,
+          menuOpenTime: profile.menu_open_time as string | null,
+          menuCloseTime: profile.menu_close_time as string | null,
         }
       : null,
   };

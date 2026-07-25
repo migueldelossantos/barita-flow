@@ -20,6 +20,9 @@ export function CompanyAdminClient() {
   const [ownerName, setOwnerName] = useState("");
   const [bank, setBank] = useState("");
   const [clabe, setClabe] = useState("");
+  const [menuEnabled, setMenuEnabled] = useState(true);
+  const [menuOpenTime, setMenuOpenTime] = useState("");
+  const [menuCloseTime, setMenuCloseTime] = useState("");
   const [menuUrl, setMenuUrl] = useState("");
   const [menuQr, setMenuQr] = useState("");
 
@@ -34,6 +37,9 @@ export function CompanyAdminClient() {
     setOwnerName(company.profile?.transferOwnerName ?? "");
     setBank(company.profile?.transferBank ?? "");
     setClabe(company.profile?.transferClabe ?? "");
+    setMenuEnabled(company.profile?.menuEnabled ?? true);
+    setMenuOpenTime(company.profile?.menuOpenTime ?? "");
+    setMenuCloseTime(company.profile?.menuCloseTime ?? "");
   }, [company]);
 
   useEffect(() => {
@@ -87,6 +93,9 @@ export function CompanyAdminClient() {
         transferOwnerName: ownerName,
         transferBank: bank,
         transferClabe: clabe,
+        menuEnabled,
+        menuOpenTime,
+        menuCloseTime,
       });
       await refresh();
       alert("Guardado correctamente");
@@ -193,6 +202,46 @@ export function CompanyAdminClient() {
             onChange={(e) => setWhatsapp(e.target.value)}
             className="w-full rounded-lg border px-3 py-2 text-sm"
           />
+        </div>
+
+        <div className="rounded-xl border bg-gray-50 p-4">
+          <label className="flex items-center gap-3 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={menuEnabled}
+              onChange={(e) => setMenuEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Encender o apagar menú
+          </label>
+          <p className="mt-1 text-xs text-gray-500">
+            Si se apaga, el menú mostrará un aviso de no disponibilidad.
+          </p>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Hora de apertura
+              </label>
+              <input
+                type="time"
+                value={menuOpenTime}
+                onChange={(e) => setMenuOpenTime(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Hora de cierre
+              </label>
+              <input
+                type="time"
+                value={menuCloseTime}
+                onChange={(e) => setMenuCloseTime(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
         </div>
 
         <hr />

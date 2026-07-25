@@ -35,36 +35,54 @@ export class OrderRepository {
       return null;
     }
 
-    for (const item of payload.items) {
+    const orderItemRows = payload.items.map((item) => {
       const lineTotal = item.unitPrice * item.quantity;
-      const { data: orderItem, error: itemError } = await this.supabase
+      return {
+        id: crypto.randomUUID(),
+        order_id: order.id,
+        product_id: item.productId,
+        product_name: item.productName,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        line_total: lineTotal,
+        special_instructions: item.specialInstructions || null,
+        configuration: {
+          toppings: item.toppings,
+          addons: item.addons,
+        },
+      };
+    });
+
+    if (orderItemRows.length > 0) {
+      const { error: orderItemsError } = await this.supabase
         .from("order_items")
-        .insert({
-          order_id: order.id,
-          product_id: item.productId,
-          product_name: item.productName,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          line_total: lineTotal,
-          special_instructions: item.specialInstructions || null,
-          configuration: {
-            toppings: item.toppings,
-            addons: item.addons,
-          },
-        })
-        .select("id")
-        .single();
+        .insert(orderItemRows);
 
-      if (itemError || !orderItem) continue;
+      if (orderItemsError) {
+        console.error("createOrder order_items error:", orderItemsError);
+        return null;
+      }
+    }
 
-      const toppingRows = item.toppings.map((t) => ({
-        order_item_id: orderItem.id,
+    const toppingRows = payload.items.flatMap((item, index) => {
+      const orderItemId = orderItemRows[index]?.id;
+      if (!orderItemId) return [];
+
+      return item.toppings.map((t) => ({
+        order_item_id: orderItemId,
         topping_name: t.name,
         is_selected: t.isSelected,
       }));
+    });
 
-      if (toppingRows.length) {
-        await this.supabase.from("order_item_toppings").insert(toppingRows);
+    if (toppingRows.length > 0) {
+      const { error: toppingError } = await this.supabase
+        .from("order_item_toppings")
+        .insert(toppingRows);
+
+      if (toppingError) {
+        console.error("createOrder order_item_toppings error:", toppingError);
+        return null;
       }
     }
 

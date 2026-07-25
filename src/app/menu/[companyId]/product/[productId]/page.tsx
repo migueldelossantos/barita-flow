@@ -1,4 +1,5 @@
 import { ProductDetailClient } from "@/presentation/components/menu/ProductDetailClient";
+import { MenuClosedNotice } from "@/presentation/components/menu/MenuClosedNotice";
 import { createServerSupabaseClient } from "@/infrastructure/supabase/server";
 import { notFound } from "next/navigation";
 import type { ProductWithDetails } from "@/domain/entities/product";
@@ -20,6 +21,28 @@ export default async function ProductPage({ params }: PageProps) {
     .single();
 
   if (!product) notFound();
+
+  const { data: company } = await supabase
+    .from("companies")
+    .select("name")
+    .eq("id", companyId)
+    .single();
+
+  const { data: profile } = await supabase
+    .from("company_profiles")
+    .select("*")
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if ((profile?.menu_enabled ?? true) === false) {
+    return (
+      <MenuClosedNotice
+        companyName={company?.name ?? "Menú"}
+        openingTime={profile?.menu_open_time}
+        closingTime={profile?.menu_close_time}
+      />
+    );
+  }
 
   const { data: variants } = await supabase
     .from("product_variants")

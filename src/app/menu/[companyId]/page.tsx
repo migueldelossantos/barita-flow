@@ -1,4 +1,5 @@
 import { MenuPageClient } from "@/presentation/components/menu/MenuPageClient";
+import { MenuClosedNotice } from "@/presentation/components/menu/MenuClosedNotice";
 import { createServerSupabaseClient } from "@/infrastructure/supabase/server";
 import { notFound } from "next/navigation";
 
@@ -23,6 +24,18 @@ export default async function MenuPage({ params }: PageProps) {
     .select("*")
     .eq("company_id", companyId)
     .maybeSingle();
+
+  const menuEnabled = profile?.menu_enabled ?? true;
+
+  if (!menuEnabled) {
+    return (
+      <MenuClosedNotice
+        companyName={company.name}
+        openingTime={profile?.menu_open_time}
+        closingTime={profile?.menu_close_time}
+      />
+    );
+  }
 
   const { data: categories } = await supabase
     .from("categories")
@@ -65,6 +78,9 @@ export default async function MenuPage({ params }: PageProps) {
           transferOwnerName: profile.transfer_owner_name,
           transferBank: profile.transfer_bank,
           transferClabe: profile.transfer_clabe,
+          menuEnabled: profile.menu_enabled,
+          menuOpenTime: profile.menu_open_time,
+          menuCloseTime: profile.menu_close_time,
         }
       : null,
   };

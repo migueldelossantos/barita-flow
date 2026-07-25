@@ -21,6 +21,9 @@ export interface CompanyProfile {
   transferOwnerName: string | null;
   transferBank: string | null;
   transferClabe: string | null;
+  menuEnabled: boolean;
+  menuOpenTime: string | null;
+  menuCloseTime: string | null;
 }
 
 export interface CompanyWithProfile extends Company {

@@ -18,12 +18,18 @@ export function SetupWizardClient() {
   const [ownerName, setOwnerName] = useState("");
   const [bank, setBank] = useState("");
   const [clabe, setClabe] = useState("");
+  const [menuEnabled, setMenuEnabled] = useState(true);
+  const [menuOpenTime, setMenuOpenTime] = useState("");
+  const [menuCloseTime, setMenuCloseTime] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!company) return;
     setName(company.name);
     setWhatsapp(company.profile?.whatsappPhone ?? company.phone);
+    setMenuEnabled(company.profile?.menuEnabled ?? true);
+    setMenuOpenTime(company.profile?.menuOpenTime ?? "");
+    setMenuCloseTime(company.profile?.menuCloseTime ?? "");
   }, [company]);
 
   if (!companyId) {
@@ -49,6 +55,9 @@ export function SetupWizardClient() {
         transferOwnerName: ownerName,
         transferBank: bank,
         transferClabe: clabe,
+        menuEnabled,
+        menuOpenTime,
+        menuCloseTime,
         isSetupComplete: false,
       });
       await refresh();
@@ -63,9 +72,14 @@ export function SetupWizardClient() {
   return (
     <main className="mx-auto max-w-2xl space-y-8 p-6">
       <h1 className="text-2xl font-bold">Configuración inicial</h1>
-      <form onSubmit={handleSave} className="space-y-4 rounded-xl border bg-white p-6 shadow-sm">
+      <form
+        onSubmit={handleSave}
+        className="space-y-4 rounded-xl border bg-white p-6 shadow-sm"
+      >
         <div>
-          <label className="mb-1 block text-sm font-medium">Nombre del negocio</label>
+          <label className="mb-1 block text-sm font-medium">
+            Nombre del negocio
+          </label>
           <input
             required
             value={name}
@@ -98,12 +112,49 @@ export function SetupWizardClient() {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Teléfono / WhatsApp</label>
+          <label className="mb-1 block text-sm font-medium">
+            Teléfono / WhatsApp
+          </label>
           <input
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
             className="w-full rounded-lg border px-3 py-2 text-sm"
           />
+        </div>
+        <div className="rounded-xl border bg-gray-50 p-4">
+          <label className="flex items-center gap-3 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={menuEnabled}
+              onChange={(e) => setMenuEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Encender o apagar menú
+          </label>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Hora de apertura
+              </label>
+              <input
+                type="time"
+                value={menuOpenTime}
+                onChange={(e) => setMenuOpenTime(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Hora de cierre
+              </label>
+              <input
+                type="time"
+                value={menuCloseTime}
+                onChange={(e) => setMenuCloseTime(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
         </div>
         <hr />
         <h2 className="font-semibold">Datos para transferencia</h2>

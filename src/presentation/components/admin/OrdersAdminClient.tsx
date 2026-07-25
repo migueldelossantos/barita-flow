@@ -184,9 +184,13 @@ export function OrdersAdminClient() {
                         type="button"
                         className="p-1 hover:text-gray-800"
                         title="Imprimir ticket"
-                        onClick={() =>
-                          printOrderTicket(order, company?.name ?? "Negocio")
-                        }
+                        onClick={async () => {
+                          await printOrderTicket(
+                            order,
+                            company?.name ?? "Negocio",
+                            `${window.location.origin}/menu/${companyId}`
+                          );
+                        }}
                       >
                         <Printer className="h-4 w-4" />
                       </button>
