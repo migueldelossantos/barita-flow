@@ -48,7 +48,6 @@ export function buildOrderWhatsAppMessage(params: WhatsAppMessageParams): string
       : `Entrega: ${DELIVERY_METHOD_LABELS[params.deliveryMethod]}`;
 
   return `Hola, mi nombre es *${params.customerName}*, este es mi pedido:\%0D\%0A
-*Número de pedido*: ${formatOrderNumber(params.orderNumber)}\%0D\%0A\%0D\%0A
 ${buildItemsList(params.items)}\%0D\%0A\%0D\%0A
 *Subtotal: ${formatCurrency(params.subtotal)}*\%0D\%0A
 *Total: ${formatCurrency(params.total)}*\%0D\%0A\%0D\%0A

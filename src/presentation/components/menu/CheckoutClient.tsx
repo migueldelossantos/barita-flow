@@ -120,18 +120,13 @@ export function CheckoutClient({ company }: CheckoutClientProps) {
       items: cart,
     };
 
-    const order = await orderRepository.createOrder(payload);
+    orderRepository.createOrder(payload);
     setSubmitting(false);
-
-    if (!order) {
-      alert("No se pudo registrar el pedido. Intenta de nuevo.");
-      return;
-    }
 
     const message = buildOrderWhatsAppMessage({
       businessPhone,
       customerName: checkout.customerName,
-      orderNumber: order.orderNumber,
+      orderNumber: 0,
       items: cart,
       subtotal,
       total,
