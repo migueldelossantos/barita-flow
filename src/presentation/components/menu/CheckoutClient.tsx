@@ -141,7 +141,7 @@ export function CheckoutClient({ company }: CheckoutClientProps) {
     clearCart();
 
     router.push(
-      `/menu/${company.id}/success?order=${order.orderNumber}&wa=${encodeURIComponent(waUrl)}&origin=checkout`
+      `/menu/${company.id}/success?wa=${encodeURIComponent(waUrl)}&origin=checkout`
     );
   };
 
