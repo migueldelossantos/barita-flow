@@ -625,41 +625,12 @@ export async function saveCompanyProfile(
 
 export async function requestLicenseChange(requestedLicense: "FREE" | "BASICA" | "PREMIUM", reactivate = false) {
   const { supabase, companyId } = await getMemberCompanyId();
-  const { data: company } = await supabase
-    .from("companies")
-    .select("id, name, phone, contact_email, license_type, license_expires_at")
-    .eq("id", companyId)
-    .single();
-  if (!company) throw new Error("No se encontró la empresa.");
-
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.LICENSE_EMAIL_FROM;
-  if (!apiKey || !from) {
-    throw new Error("El envío automático no está configurado. Configura RESEND_API_KEY y LICENSE_EMAIL_FROM.");
-  }
-
-  const { data: auth } = await supabase.auth.getUser();
-  const contactName = String(auth.user?.user_metadata?.full_name ?? auth.user?.user_metadata?.name ?? "No indicado");
-  const text = [
-    `Solicitud para ${reactivate ? "reactivar" : "cambiar"} licencia`,
-    `Empresa: ${company.name}`,
-    `ID de cliente: ${company.id}`,
-    `Licencia actual: ${company.license_type}`,
-    `Licencia solicitada: ${requestedLicense}`,
-    `Vigencia actual: ${company.license_expires_at}`,
-    `Contacto: ${contactName}`,
-    `Correo de contacto: ${company.contact_email ?? auth.user?.email ?? "No indicado"}`,
-    `Teléfono: ${company.phone}`,
-  ].join("\n");
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from,
-      to: ["migueldelossantosh@gmail.com"],
-      subject: `${reactivate ? "Reactivación" : "Cambio"} de licencia — ${company.name}`,
-      text,
-    }),
+  const { error } = await supabase.from("license_requests").insert({
+    company_id: companyId,
+    requested_license: requestedLicense,
+    kind: reactivate ? "reactivation" : "change",
   });
-  if (!response.ok) throw new Error("No se pudo enviar la solicitud a Atención a clientes de iToCode.");
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/dashboard/licenses");
+  revalidatePath("/super-admin");
 }

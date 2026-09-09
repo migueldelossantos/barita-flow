@@ -2,9 +2,10 @@
 
 import { useCompany } from "@/presentation/providers/CompanyProvider";
 import { requestLicenseChange } from "@/app/actions/admin";
+import { createClient } from "@/infrastructure/supabase/client";
 import { LICENSES, normalizeLicense, type PlanKey } from "@/lib/licenses";
-import { Check, Mail, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { Check, ClipboardList, ShieldAlert } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 
 const planOrder: PlanKey[] = ["FREE", "BASICA", "PREMIUM"];
@@ -13,13 +14,26 @@ export function LicensePlansClient({ expired = false }: { expired?: boolean }) {
   const { company } = useCompany();
   const [selected, setSelected] = useState<PlanKey>(company ? normalizeLicense(company.licenseType) : "FREE");
   const [message, setMessage] = useState<string | null>(null);
+  const [requests, setRequests] = useState<{ id: string; requested_license: string; kind: string; status: string; admin_note: string | null; created_at: string }[]>([]);
   const current = company ? normalizeLicense(company.licenseType) : "FREE";
+
+  const loadRequests = useCallback(async () => {
+    if (!company) return;
+    const { data } = await createClient().from("license_requests")
+      .select("id, requested_license, kind, status, admin_note, created_at")
+      .eq("company_id", company.id)
+      .order("created_at", { ascending: false });
+    setRequests(data ?? []);
+  }, [company]);
+
+  useEffect(() => { loadRequests(); }, [loadRequests]);
 
   const request = async () => {
     if (!company) return;
     try {
       await requestLicenseChange(selected, expired);
-      setMessage("Tu solicitud fue enviada a Atención a clientes de iToCode.");
+      setMessage("Tu solicitud fue registrada. Atención a clientes de iToCode la revisará pronto.");
+      await loadRequests();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo enviar la solicitud.");
     }
@@ -41,6 +55,7 @@ export function LicensePlansClient({ expired = false }: { expired?: boolean }) {
       <div className="rounded-xl border bg-white p-4 text-sm shadow-sm">
         Licencia actual: <strong>{LICENSES[current].name}</strong> · Vigente hasta <strong>{new Date(company.licenseExpiresAt).toLocaleDateString("es-MX")}</strong>
       </div>
+      {requests.length > 0 && <section className="rounded-xl border bg-white p-4 shadow-sm"><h2 className="font-semibold">Mis solicitudes</h2><div className="mt-3 space-y-2">{requests.slice(0, 5).map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-sm"><span>{item.kind === "reactivation" ? "Reactivación" : "Cambio"} a <strong>{item.requested_license}</strong></span><span className={`rounded-full px-2 py-1 text-xs ${item.status === "approved" ? "bg-green-100 text-green-700" : item.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{item.status === "pending" ? "Pendiente" : item.status === "approved" ? "Aprobada" : "Rechazada"}</span>{item.admin_note && <p className="w-full text-xs text-gray-500">Nota: {item.admin_note}</p>}</div>)}</div></section>}
       <div className="grid gap-4 md:grid-cols-3">
         {planOrder.map((key) => {
           const plan = LICENSES[key];
@@ -59,7 +74,7 @@ export function LicensePlansClient({ expired = false }: { expired?: boolean }) {
           </article>;
         })}
       </div>
-      {!expired && <div className="rounded-2xl bg-gray-900 p-5 text-white sm:flex sm:items-center sm:justify-between"><div><h2 className="font-semibold">¿Quieres cambiar de licencia?</h2><p className="mt-1 text-sm text-gray-300">Atención a clientes de iToCode recibirá los datos de tu empresa y la licencia seleccionada.</p></div><Button variant="green" onClick={request} className="mt-4 sm:mt-0"><Mail className="mr-2 h-4 w-4" />Contactar a iToCode</Button></div>}
+      {!expired && <div className="rounded-2xl bg-gray-900 p-5 text-white sm:flex sm:items-center sm:justify-between"><div><h2 className="font-semibold">¿Quieres cambiar de licencia?</h2><p className="mt-1 text-sm text-gray-300">Envía tu solicitud a Atención a clientes de iToCode para su revisión.</p></div><Button variant="green" onClick={request} className="mt-4 sm:mt-0"><ClipboardList className="mr-2 h-4 w-4" />Enviar solicitud</Button></div>}
       {message && <p className="text-center text-sm text-gray-600">{message}</p>}
     </main>
   );

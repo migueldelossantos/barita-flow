@@ -114,3 +114,39 @@ export async function linkMemberToCompany(
   if (error) throw new Error(error.message);
   revalidatePath("/super-admin");
 }
+
+export async function resolveLicenseRequest(
+  requestId: string,
+  decision: "approved" | "rejected",
+  adminNote = ""
+) {
+  const admin = await assertSystemAdmin();
+  const service = createServiceRoleClient();
+  const { data: request, error: requestError } = await service
+    .from("license_requests")
+    .select("id, company_id, requested_license, status")
+    .eq("id", requestId)
+    .single();
+  if (requestError || !request) throw new Error("Solicitud no encontrada.");
+  if (request.status !== "pending") throw new Error("Esta solicitud ya fue atendida.");
+
+  if (decision === "approved") {
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + 1);
+    const { error } = await service.from("companies").update({
+      license_type: request.requested_license,
+      license_expires_at: expiresAt.toISOString(),
+    }).eq("id", request.company_id);
+    if (error) throw new Error(error.message);
+  }
+
+  const { error } = await service.from("license_requests").update({
+    status: decision,
+    admin_note: adminNote || null,
+    resolved_by: admin.id,
+    resolved_at: new Date().toISOString(),
+  }).eq("id", requestId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/super-admin");
+  revalidatePath("/admin/dashboard/licenses");
+}
