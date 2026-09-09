@@ -170,7 +170,18 @@ export function ProductDetailClient({
       productName: finalProductName,
       unitPrice,
       quantity,
-      toppings: [...currentToppingsVisibles.filter((t) => t.isSelected), ...product.optionGroups.flatMap((group) => group.options.filter((option) => (selectedOptions[group.id] ?? []).includes(option.id)).map((option) => ({ name: `${group.name}: ${option.name}`, isSelected: true, mode: "option" }))],
+      toppings: [
+        ...currentToppingsVisibles.filter((t) => t.isSelected),
+        ...product.optionGroups.flatMap((group) =>
+          group.options
+            .filter((option) => (selectedOptions[group.id] ?? []).includes(option.id))
+            .map((option) => ({
+              name: `${group.name}: ${option.name}`,
+              isSelected: true,
+              mode: "option",
+            }))
+        ),
+      ],
       addons: [],
       specialInstructions: instructions,
     });
