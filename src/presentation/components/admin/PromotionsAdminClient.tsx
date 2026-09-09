@@ -5,6 +5,8 @@ import type { Product } from "@/domain/entities/product";
 import { createClient } from "@/infrastructure/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import { useCompany } from "@/presentation/providers/CompanyProvider";
+import { normalizeLicense } from "@/lib/licenses";
+import Link from "next/link";
 import {
   Pencil,
   Plus,
@@ -320,7 +322,7 @@ function CouponFormModal({
 }
 
 export function PromotionsAdminClient() {
-  const { companyId, loading: ctxLoading } = useCompany();
+  const { companyId, company, loading: ctxLoading } = useCompany();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
@@ -402,6 +404,17 @@ export function PromotionsAdminClient() {
 
   if (ctxLoading || !companyId) {
     return <p className="text-gray-500">Cargando promociones...</p>;
+  }
+
+  if (company && normalizeLicense(company.licenseType) === "FREE") {
+    return (
+      <section className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+        <ShieldCheck className="mx-auto h-10 w-10 text-amber-600" />
+        <h1 className="mt-3 text-2xl font-bold">Cupones y ofertas</h1>
+        <p className="mt-2 text-gray-700">Esta sección está disponible con la licencia Básica. Actualiza tu plan para crear cupones, promociones y ofertas.</p>
+        <Link href="/admin/dashboard/licenses" className="mt-5 inline-flex rounded-lg bg-brand-green px-4 py-2 text-sm font-semibold text-white">Ver licencias</Link>
+      </section>
+    );
   }
 
   return (

@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import {
   Building2,
   LayoutDashboard,
+  CreditCard,
   Menu,
   Package,
   Shield,
@@ -25,18 +26,21 @@ const NAV = [
   { href: "/admin/dashboard/categories", label: "Categorías", icon: Menu },
   { href: "/admin/dashboard/company", label: "Mi empresa", icon: Building2 },
   { href: "/admin/dashboard/profile", label: "Mi perfil", icon: User },
+  { href: "/admin/dashboard/licenses", label: "Licencias", icon: CreditCard },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const { isSystemAdmin } = useCompany();
 
   return (
+    <>
+      {!open && <button type="button" onClick={() => setOpen(true)} className="fixed left-3 top-3 z-30 rounded-lg border bg-white px-3 py-2 text-sm font-semibold shadow md:hidden">≡ Menú</button>}
     <aside
       className={cn(
-        "sticky top-0 flex h-screen flex-col border-r border-gray-200 bg-white transition-all",
-        open ? "w-56" : "w-16"
+        "fixed inset-y-0 left-0 z-40 flex h-screen flex-col border-r border-gray-200 bg-white shadow-xl transition-all md:sticky md:shadow-none",
+        open ? "w-56 translate-x-0" : "w-56 -translate-x-full md:w-16 md:translate-x-0"
       )}
     >
       <button
@@ -46,11 +50,12 @@ export function AdminSidebar() {
       >
         {open ? "≡ Menú" : "≡"}
       </button>
-      <nav className="flex-1 space-y-1 p-2">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-2">
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
+            onClick={() => setOpen(false)}
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
               pathname === href ||
@@ -66,6 +71,7 @@ export function AdminSidebar() {
         {isSystemAdmin && (
           <Link
             href="/super-admin"
+            onClick={() => setOpen(false)}
             className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-amber-700 hover:bg-amber-50"
           >
             <Shield className="h-5 w-5 shrink-0" />
@@ -75,5 +81,6 @@ export function AdminSidebar() {
       </nav>
       <AdminUserPanel collapsed={!open} />
     </aside>
+    </>
   );
 }

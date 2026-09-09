@@ -1,4 +1,4 @@
-export type LicenseType = "DEMO" | "RENTA";
+export type LicenseType = "DEMO" | "RENTA" | "FREE" | "BASICA" | "PREMIUM";
 
 export type DeliveryMethod = "delivery" | "pickup" | "dine_in";
 

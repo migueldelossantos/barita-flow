@@ -118,6 +118,7 @@ export function OrderCreateAdminClient() {
   const [cashAmount, setCashAmount] = useState("");
   const [coords, setCoords] = useState<google.maps.LatLngLiteral | null>(null);
   const [insideZone, setInsideZone] = useState<boolean | null>(null);
+  const [limitNotice, setLimitNotice] = useState<string | null>(null);
 
   const loadCatalog = useCallback(async () => {
     if (!companyId) return;
@@ -125,14 +126,24 @@ export function OrderCreateAdminClient() {
     setLoadingCatalog(true);
     const supabase = createClient();
 
-    const { data: products, error } = await supabase
-      .from("products")
-      .select(
-        "id, company_id, category_id, code, name, description, price, image_url, is_active, is_bestseller, sales_count"
-      )
-      .eq("company_id", companyId)
-      .eq("is_active", true)
-      .order("name");
+    const [{ data: products, error }, { count: monthlyOrders }] = await Promise.all([
+      supabase
+        .from("products")
+        .select("id, company_id, category_id, code, name, description, price, image_url, is_active, is_bestseller, sales_count")
+        .eq("company_id", companyId)
+        .eq("is_active", true)
+        .order("name"),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+        .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+    ]);
+
+    if (company?.licenseType === "FREE" && (monthlyOrders ?? 0) >= 80 && (monthlyOrders ?? 0) < 100) {
+      setLimitNotice(`Estás por llegar al límite FREE: ${monthlyOrders} de 100 órdenes este mes.`);
+      window.setTimeout(() => setLimitNotice(null), 3000);
+    }
 
     if (error) {
       console.error("loadCatalog products error:", error);
@@ -188,7 +199,7 @@ export function OrderCreateAdminClient() {
 
     setCatalog(mapped);
     setLoadingCatalog(false);
-  }, [companyId]);
+  }, [company?.licenseType, companyId]);
 
   useEffect(() => {
     loadCatalog();
@@ -395,6 +406,7 @@ export function OrderCreateAdminClient() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {limitNotice && <div role="status" className="fixed bottom-4 right-4 z-50 rounded-xl bg-gray-900 px-4 py-3 text-sm text-white shadow-xl">{limitNotice}</div>}
       <div className="flex items-center gap-3">
         <button
           type="button"

@@ -102,3 +102,16 @@ Bucket `company-assets` (público). Rutas: `{companyId}/logo|banner|products/...
 ## Nota sobre WhatsApp
 
 El enlace `wa.me` abre WhatsApp con el mensaje prellenado. El envío lo confirma el usuario en la app de WhatsApp; no es posible enviar mensajes automáticamente desde el navegador sin la API oficial de Meta Business.
+# Configuración de licencias
+
+Los nuevos usuarios de Google se crean automáticamente con una empresa y licencia `FREE` por 30 días. Google no garantiza compartir un número telefónico, por lo que el asistente de configuración inicial lo solicita y lo guarda en `companies.phone` y en el perfil de empresa.
+
+Para enviar automáticamente las solicitudes de cambio o reactivación a Atención a clientes de iToCode, configura estas variables en el entorno de producción (con un dominio remitente verificado en Resend):
+
+```env
+SUPABASE_SERVICE_ROLE_KEY=...
+RESEND_API_KEY=...
+LICENSE_EMAIL_FROM="iToCode <licencias@tu-dominio.com>"
+```
+
+Después aplica la migración `supabase/migrations/20260909000000_free_licenses_and_limits.sql`.

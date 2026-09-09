@@ -35,6 +35,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }
 
+  // An expired tenant may access only the licensing screen.
+  if (path.startsWith("/admin") && path !== "/admin" && !path.startsWith("/admin/dashboard/licenses") && user) {
+    const { data: member } = await supabase
+      .from("company_members")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (member) {
+      const { data: company } = await supabase
+        .from("companies")
+        .select("license_expires_at")
+        .eq("id", member.company_id)
+        .maybeSingle();
+      if (company && new Date(company.license_expires_at) <= new Date()) {
+        return NextResponse.redirect(new URL("/admin/dashboard/licenses", request.url));
+      }
+    }
+  }
+
   if (path.startsWith("/super-admin") && !user) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }

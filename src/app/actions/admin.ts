@@ -84,6 +84,14 @@ async function getMemberCompanyId() {
   return { supabase, companyId: member.company_id as string };
 }
 
+async function ensureActiveLicense(companyId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data: company } = await supabase.from("companies").select("license_expires_at").eq("id", companyId).single();
+  if (!company || new Date(company.license_expires_at) <= new Date()) {
+    throw new Error("Tu licencia está vencida. Reactívala desde la sección Licencias.");
+  }
+}
+
 export async function saveCategory(
   companyId: string,
   data: {
@@ -94,6 +102,7 @@ export async function saveCategory(
   }
 ) {
   const { supabase } = await getMemberCompanyId();
+  await ensureActiveLicense(companyId);
 
   if (data.id) {
     const { error } = await supabase
@@ -120,6 +129,7 @@ export async function saveCategory(
 
 export async function deleteCategory(companyId: string, categoryId: string) {
   const { supabase } = await getMemberCompanyId();
+  await ensureActiveLicense(companyId);
 
   const { count } = await supabase
     .from("products")
@@ -147,6 +157,7 @@ export async function saveProduct(
   code?: string
 ) {
   const { supabase } = await getMemberCompanyId();
+  await ensureActiveLicense(companyId);
 
   let pid = productId;
 
@@ -263,6 +274,7 @@ export async function saveProduct(
 
 export async function deleteProduct(companyId: string, productId: string) {
   const { supabase } = await getMemberCompanyId();
+  await ensureActiveLicense(companyId);
   const { error } = await supabase
     .from("products")
     .delete()
@@ -278,6 +290,7 @@ export async function toggleProductActive(
   isActive: boolean
 ) {
   const { supabase } = await getMemberCompanyId();
+  await ensureActiveLicense(companyId);
   const { error } = await supabase
     .from("products")
     .update({ is_active: isActive })
@@ -293,6 +306,7 @@ export async function advanceOrderStatus(
   nextStatus: string
 ) {
   const { supabase } = await getMemberCompanyId();
+  await ensureActiveLicense(companyId);
   const { error } = await supabase
     .from("orders")
     .update({ status: nextStatus })
@@ -307,6 +321,7 @@ export async function saveCoupon(
   data: CouponInput
 ) {
   const { supabase } = await getMemberCompanyId();
+  await ensureActiveLicense(companyId);
   const code = data.code.trim().toUpperCase();
 
   if (!code) throw new Error("El codigo del cupon es obligatorio");
@@ -363,6 +378,7 @@ export async function saveCoupon(
 
 export async function deleteCoupon(companyId: string, couponId: string) {
   const { supabase } = await getMemberCompanyId();
+  await ensureActiveLicense(companyId);
   const { error } = await supabase
     .from("coupons")
     .delete()
@@ -562,10 +578,13 @@ export async function saveCompanyProfile(
 ) {
   const { supabase } = await getMemberCompanyId();
 
-  await supabase
-    .from("companies")
-    .update({ name: data.name, is_setup_complete: data.isSetupComplete ?? true })
-    .eq("id", companyId);
+  const { error: companyError } = await supabase.rpc("update_own_company_profile", {
+    p_company_id: companyId,
+    p_name: data.name,
+    p_phone: data.whatsappPhone,
+    p_setup_complete: data.isSetupComplete ?? true,
+  });
+  if (companyError) throw new Error(companyError.message);
 
   const { data: existing } = await supabase
     .from("company_profiles")
@@ -602,4 +621,45 @@ export async function saveCompanyProfile(
   }
 
   revalidatePath("/admin/dashboard/company");
+}
+
+export async function requestLicenseChange(requestedLicense: "FREE" | "BASICA" | "PREMIUM", reactivate = false) {
+  const { supabase, companyId } = await getMemberCompanyId();
+  const { data: company } = await supabase
+    .from("companies")
+    .select("id, name, phone, contact_email, license_type, license_expires_at")
+    .eq("id", companyId)
+    .single();
+  if (!company) throw new Error("No se encontró la empresa.");
+
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.LICENSE_EMAIL_FROM;
+  if (!apiKey || !from) {
+    throw new Error("El envío automático no está configurado. Configura RESEND_API_KEY y LICENSE_EMAIL_FROM.");
+  }
+
+  const { data: auth } = await supabase.auth.getUser();
+  const contactName = String(auth.user?.user_metadata?.full_name ?? auth.user?.user_metadata?.name ?? "No indicado");
+  const text = [
+    `Solicitud para ${reactivate ? "reactivar" : "cambiar"} licencia`,
+    `Empresa: ${company.name}`,
+    `ID de cliente: ${company.id}`,
+    `Licencia actual: ${company.license_type}`,
+    `Licencia solicitada: ${requestedLicense}`,
+    `Vigencia actual: ${company.license_expires_at}`,
+    `Contacto: ${contactName}`,
+    `Correo de contacto: ${company.contact_email ?? auth.user?.email ?? "No indicado"}`,
+    `Teléfono: ${company.phone}`,
+  ].join("\n");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from,
+      to: ["migueldelossantosh@gmail.com"],
+      subject: `${reactivate ? "Reactivación" : "Cambio"} de licencia — ${company.name}`,
+      text,
+    }),
+  });
+  if (!response.ok) throw new Error("No se pudo enviar la solicitud a Atención a clientes de iToCode.");
 }

@@ -11,7 +11,7 @@ import { Button } from "../ui/Button";
 import { ProductFormModal } from "./ProductFormModal";
 
 export function ProductsAdminClient() {
-  const { companyId, loading: ctxLoading } = useCompany();
+  const { companyId, company, loading: ctxLoading } = useCompany();
   const [products, setProducts] = useState<
     (Product & {variants: ProductVariant[], toppings: ProductTopping[]; categoryName?: string })[]
   >([]);
@@ -21,6 +21,7 @@ export function ProductsAdminClient() {
   const [editing, setEditing] = useState<
     (Product & {variants: ProductVariant[], toppings: ProductTopping[] }) | null
   >(null);
+  const [limitNotice, setLimitNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!companyId) return;
@@ -105,12 +106,22 @@ export function ProductsAdminClient() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (company?.licenseType !== "FREE") return;
+    if (products.length >= 8 && products.length < 10) {
+      setLimitNotice(`Estás por llegar al límite FREE: ${products.length} de 10 productos.`);
+      const timeout = window.setTimeout(() => setLimitNotice(null), 3000);
+      return () => window.clearTimeout(timeout);
+    }
+  }, [company?.licenseType, products.length]);
+
   if (ctxLoading || !companyId) {
     return <p className="text-gray-500">Cargando empresa...</p>;
   }
 
   return (
     <div className="space-y-6">
+      {limitNotice && <div role="status" className="fixed bottom-4 right-4 z-50 rounded-xl bg-gray-900 px-4 py-3 text-sm text-white shadow-xl">{limitNotice}</div>}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Productos</h1>
         <Button

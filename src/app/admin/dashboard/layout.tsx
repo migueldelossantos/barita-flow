@@ -1,6 +1,7 @@
 import { AdminSidebar } from "@/presentation/components/admin/AdminSidebar";
 import { NewOrderNotifier } from "@/presentation/components/admin/NewOrderNotifier";
 import { NoCompanyLinkedBanner } from "@/presentation/components/admin/NoCompanyLinkedBanner";
+import { LicenseAccessGate } from "@/presentation/components/admin/LicenseAccessGate";
 
 export default function DashboardLayout({
   children,
@@ -8,11 +9,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 md:flex">
       <AdminSidebar />
-      <main className="flex-1 overflow-auto p-6">
+      <main className="min-w-0 flex-1 overflow-auto p-4 pt-16 sm:p-6 md:pt-6">
         <NoCompanyLinkedBanner />
-        {children}
+        <LicenseAccessGate>{children}</LicenseAccessGate>
       </main>
       <NewOrderNotifier />
     </div>

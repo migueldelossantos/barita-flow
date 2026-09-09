@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/infrastructure/supabase/server";
+import { createServiceRoleClient } from "@/infrastructure/supabase/admin";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -54,6 +55,40 @@ export async function GET(request: Request) {
 
     if (sysAdmin) {
       return NextResponse.redirect(`${origin}/super-admin`);
+    }
+
+    // First Google login: create the tenant and make this user its owner.
+    // Google OAuth normally does not expose a phone number, so onboarding asks for it.
+    try {
+      const admin = createServiceRoleClient();
+      const metadata = user.user_metadata ?? {};
+      const name = String(metadata.full_name ?? metadata.name ?? user.email?.split("@")[0] ?? "Mi empresa");
+      const phone = String(metadata.phone ?? "Pendiente");
+      const { data: company, error: companyError } = await admin
+        .from("companies")
+        .insert({
+          name,
+          phone,
+          contact_email: user.email ?? null,
+          license_type: "FREE",
+          // Free onboarding has 30 days of validity; it can be renewed by the administrator.
+          license_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          is_setup_complete: false,
+        })
+        .select("id")
+        .single();
+      if (companyError || !company) throw new Error(companyError?.message ?? "No se pudo crear la empresa");
+      const { error: memberError } = await admin.from("company_members").insert({
+        company_id: company.id,
+        user_id: user.id,
+        role: "owner",
+      });
+      if (memberError) throw new Error(memberError.message);
+      return NextResponse.redirect(`${origin}/admin/setup`);
+    } catch (creationError) {
+      return NextResponse.redirect(`${origin}/admin?error=auth&message=${encodeURIComponent(
+        creationError instanceof Error ? creationError.message : "No se pudo preparar tu cuenta"
+      )}`);
     }
   }
 
