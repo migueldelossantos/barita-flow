@@ -28,6 +28,7 @@ export interface ProductInput {
   imageUrl: string | null;
   isActive: boolean;
   variants: VariantInput[]
+  optionGroups: { name: string; selectionType: "required" | "optional" | "multiple"; minSelections: number; maxSelections: number; options: { name: string; priceAdjustment: number }[] }[];
   toppings: ToppingInput[];
 }
 
@@ -65,6 +66,23 @@ export interface PrintThermalTicketInput {
   total: number;
   comments?: string | null;
   items: ThermalTicketItem[];
+}
+
+async function saveProductOptionGroups(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, productId: string, groups: ProductInput["optionGroups"]) {
+  const { error: deleteError } = await supabase.from("product_option_groups").delete().eq("product_id", productId);
+  if (deleteError) throw new Error(deleteError.message);
+  for (const [index, group] of groups.entries()) {
+    if (!group.name.trim() || group.options.filter((option) => option.name.trim()).length === 0) continue;
+    const { data: created, error } = await supabase.from("product_option_groups").insert({
+      product_id: productId, name: group.name.trim(), selection_type: group.selectionType,
+      min_selections: group.minSelections, max_selections: group.maxSelections, sort_order: index,
+    }).select("id").single();
+    if (error || !created) throw new Error(error?.message ?? "No se pudo guardar el grupo de opciones");
+    const { error: optionError } = await supabase.from("product_option_values").insert(group.options.filter((option) => option.name.trim()).map((option, optionIndex) => ({
+      group_id: created.id, name: option.name.trim(), price_adjustment: option.priceAdjustment || 0, sort_order: optionIndex,
+    })));
+    if (optionError) throw new Error(optionError.message);
+  }
 }
 
 async function getMemberCompanyId() {
@@ -268,6 +286,7 @@ export async function saveProduct(
     }
   }
 
+  if (pid) await saveProductOptionGroups(supabase, pid, data.optionGroups ?? []);
   revalidatePath("/admin/dashboard/products");
   return pid;
 }

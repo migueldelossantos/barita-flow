@@ -56,8 +56,9 @@ export function AdminSidebar() {
             key={href}
             href={href}
             onClick={() => setOpen(false)}
+            aria-label={label}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+              "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
               pathname === href ||
                 (href !== "/admin/dashboard" && pathname.startsWith(href + "/"))
                 ? "bg-brand-green/10 text-brand-green"
@@ -66,16 +67,19 @@ export function AdminSidebar() {
           >
             <Icon className="h-5 w-5 shrink-0" />
             {open && <span>{label}</span>}
+            {!open && <span role="tooltip" className="pointer-events-none absolute left-full z-50 ml-3 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg md:block md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-focus:opacity-100">{label}</span>}
           </Link>
         ))}
         {isSystemAdmin && (
           <Link
             href="/super-admin"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-amber-700 hover:bg-amber-50"
+            aria-label="Super Admin"
+            className="group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-amber-700 hover:bg-amber-50"
           >
             <Shield className="h-5 w-5 shrink-0" />
             {open && <span>Super Admin</span>}
+            {!open && <span role="tooltip" className="pointer-events-none absolute left-full z-50 ml-3 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg md:block md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-focus:opacity-100">Super Admin</span>}
           </Link>
         )}
       </nav>

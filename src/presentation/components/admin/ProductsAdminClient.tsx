@@ -43,7 +43,7 @@ export function ProductsAdminClient() {
 
     const withToppings = await Promise.all(
       (prods ?? []).map(async (p) => {
-        const [{ data: tops }, { data: vars }] = await Promise.all([
+        const [{ data: tops }, { data: vars }, { data: groups }] = await Promise.all([
           supabase
             .from("product_toppings")
             .select("*")
@@ -54,7 +54,10 @@ export function ProductsAdminClient() {
             .select("*")
             .eq("product_id", p.id)
             .order("sort_order"),
+          supabase.from("product_option_groups").select("*").eq("product_id", p.id).order("sort_order"),
         ])
+        const groupIds = (groups ?? []).map((group) => group.id);
+        const { data: optionRows } = groupIds.length ? await supabase.from("product_option_values").select("*").in("group_id", groupIds).order("sort_order") : { data: [] as any[] };
         const cat = p.categories as { name: string } | null;
         return {
           id: p.id,
@@ -75,6 +78,7 @@ export function ProductsAdminClient() {
             name: v.name,
             price: Number(v.price),
           })),
+          optionGroups: (groups ?? []).map((group) => ({ id: group.id, name: group.name, selectionType: group.selection_type, minSelections: group.min_selections, maxSelections: group.max_selections, sortOrder: group.sort_order, options: (optionRows ?? []).filter((option) => option.group_id === group.id).map((option) => ({ id: option.id, name: option.name, priceAdjustment: Number(option.price_adjustment), sortOrder: option.sort_order })) })),
           toppings: (tops ?? []).map((t) => ({
             id: t.id,
             productId: t.product_id,

@@ -169,6 +169,7 @@ export class MenuRepository {
         maxSelectable: t.max_selectable
       })),
       variants: [],
+      optionGroups: [],
       addonProducts,
     };
   }

@@ -39,8 +39,12 @@ export interface ProductVariant {
   price: number
 }
 
+export interface ProductOptionValue { id: string; name: string; priceAdjustment: number; sortOrder: number; }
+export interface ProductOptionGroup { id: string; name: string; selectionType: "required" | "optional" | "multiple"; minSelections: number; maxSelections: number; sortOrder: number; options: ProductOptionValue[]; }
+
 export interface ProductWithDetails extends Product {
   variants: ProductVariant[];
+  optionGroups: ProductOptionGroup[];
   toppings: ProductTopping[];
   addonProducts: Product[];
   category: Category | null;

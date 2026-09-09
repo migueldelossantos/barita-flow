@@ -56,6 +56,16 @@ export default async function ProductPage({ params }: PageProps) {
     .eq("product_id", productId)
     .order("sort_order");
 
+  const { data: optionGroups } = await supabase
+    .from("product_option_groups")
+    .select("*")
+    .eq("product_id", productId)
+    .order("sort_order");
+  const groupIds = (optionGroups ?? []).map((group) => group.id);
+  const { data: optionValues } = groupIds.length
+    ? await supabase.from("product_option_values").select("*").in("group_id", groupIds).order("sort_order")
+    : { data: [] as Record<string, unknown>[] };
+
   const { data: addonLinks } = await supabase
     .from("product_addons")
     .select("addon_product_id")
@@ -111,6 +121,15 @@ export default async function ProductPage({ params }: PageProps) {
       sortOrder: t.sort_order,
       variantId: t.variant_id,
       maxSelectable: t.max_selectable
+    })),
+    optionGroups: (optionGroups ?? []).map((group) => ({
+      id: group.id,
+      name: group.name,
+      selectionType: group.selection_type,
+      minSelections: group.min_selections,
+      maxSelections: group.max_selections,
+      sortOrder: group.sort_order,
+      options: (optionValues ?? []).filter((option) => option.group_id === group.id).map((option) => ({ id: option.id, name: option.name, priceAdjustment: Number(option.price_adjustment), sortOrder: option.sort_order })),
     })),
     addonProducts: addonProducts.map((p) => ({
       id: p.id as string,

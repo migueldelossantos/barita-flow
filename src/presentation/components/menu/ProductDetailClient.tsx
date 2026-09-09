@@ -62,6 +62,7 @@ export function ProductDetailClient({
     }))
   );
   const [instructions, setInstructions] = useState("");
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({});
 
   // --- MANEJO CAMBIO DE VARIANTE ---
   const handleVariantChange = (variant: any) => {
@@ -95,10 +96,8 @@ export function ProductDetailClient({
   // Si tiene variantes toma su precio dinámico, de lo contrario cae al precio plano del producto
   const basePrice = hasVariants ? (selectedVariant?.price ?? 0) : product.price;
 
-  const unitPrice = useMemo(
-    () => computeItemUnitPrice(basePrice, addons),
-    [basePrice, addons]
-  );
+  const optionAdjustment = product.optionGroups.reduce((sum, group) => sum + group.options.filter((option) => (selectedOptions[group.id] ?? []).includes(option.id)).reduce((optionSum, option) => optionSum + option.priceAdjustment, 0), 0);
+  const unitPrice = useMemo(() => computeItemUnitPrice(basePrice + optionAdjustment, addons), [basePrice, optionAdjustment, addons]);
   const lineTotal = unitPrice * quantity;
 
   // --- MANEJO DE SELECCIONES ---
@@ -157,6 +156,8 @@ export function ProductDetailClient({
       ? `${product.name} (${selectedVariant.name})` 
       : product.name;
 
+    const invalidGroup = product.optionGroups.find((group) => group.selectionType === "required" && (selectedOptions[group.id] ?? []).length < Math.max(1, group.minSelections));
+    if (invalidGroup) { alert(`Selecciona una opción para ${invalidGroup.name}.`); return null; }
     const hasSelectectToppings = requiredToppings.length > 0 && currentToppingsVisibles.filter((t) => t.isSelected).length === 0
     if (hasSelectectToppings) {
       alert(`Debes de seleccionar al menos un topping para tu producto.`);
@@ -169,7 +170,7 @@ export function ProductDetailClient({
       productName: finalProductName,
       unitPrice,
       quantity,
-      toppings: currentToppingsVisibles.filter((t) => t.isSelected),
+      toppings: [...currentToppingsVisibles.filter((t) => t.isSelected), ...product.optionGroups.flatMap((group) => group.options.filter((option) => (selectedOptions[group.id] ?? []).includes(option.id)).map((option) => ({ name: `${group.name}: ${option.name}`, isSelected: true, mode: "option" }))],
       addons: [],
       specialInstructions: instructions,
     });
@@ -246,6 +247,8 @@ export function ProductDetailClient({
             </div>
           </section>
         )}
+
+        {product.optionGroups.map((group) => <section key={group.id} className="rounded-xl border bg-gray-50 p-3"><h3 className="text-sm font-semibold">{group.name}{group.selectionType === "required" && " *"}</h3><p className="mb-2 text-xs text-gray-500">{group.selectionType === "multiple" ? `Selecciona hasta ${group.maxSelections}` : group.selectionType === "optional" ? "Opcional" : "Selecciona una opción"}</p><div className="grid gap-2 sm:grid-cols-2">{group.options.map((option) => { const selected = (selectedOptions[group.id] ?? []).includes(option.id); return <button key={option.id} type="button" onClick={() => setSelectedOptions((current) => { const currentIds = current[group.id] ?? []; if (group.selectionType === "multiple") { if (!selected && currentIds.length >= group.maxSelections) return current; return { ...current, [group.id]: selected ? currentIds.filter((id) => id !== option.id) : [...currentIds, option.id] }; } return { ...current, [group.id]: selected ? [] : [option.id] }; })} className={cn("rounded-lg border px-3 py-2 text-left text-sm", selected ? "border-brand-green bg-brand-green/10 text-brand-green" : "bg-white")}>{option.name}{option.priceAdjustment !== 0 && <span className="float-right">+{formatCurrency(option.priceAdjustment)}</span>}</button>; })}</div></section>)}
 
         <div>
           <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-800">

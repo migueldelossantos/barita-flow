@@ -36,6 +36,7 @@ interface ToppingRow {
   variantId: string;
   maxSelectable: number;
 }
+interface OptionGroupRow { id: string; name: string; selectionType: "required" | "optional" | "multiple"; minSelections: number; maxSelections: number; options: { id: string; name: string; priceAdjustment: string }[]; }
 
 const MODES: ToppingMode[] = [
   "locked",
@@ -63,6 +64,7 @@ export function ProductFormModal({
   const [saving, setSaving] = useState(false);
   const [variants, setVariants] = useState<VariantRow[]>([]);
   const [hasVariants, setHasVariants] = useState(false);
+  const [optionGroups, setOptionGroups] = useState<OptionGroupRow[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,6 +92,7 @@ export function ProductFormModal({
         maxSelectable: t.maxSelectable ?? 1
       }))
     );
+    setOptionGroups(((product as any)?.optionGroups ?? []).map((group: any) => ({ id: group.id, name: group.name, selectionType: group.selectionType, minSelections: group.minSelections, maxSelections: group.maxSelections, options: group.options.map((option: any) => ({ id: option.id, name: option.name, priceAdjustment: String(option.priceAdjustment) })) })));
   }, [open, product, categories]);
 
   const addVariant = () => {
@@ -133,6 +136,9 @@ export function ProductFormModal({
   const removeTopping = (id: string) => {
     setToppings((rows) => rows.filter((r) => r.id !== id));
   };
+  const addOptionGroup = () => setOptionGroups((current) => [...current, { id: crypto.randomUUID(), name: "", selectionType: "required", minSelections: 1, maxSelections: 1, options: [{ id: crypto.randomUUID(), name: "", priceAdjustment: "0" }] }]);
+  const updateOptionGroup = (id: string, patch: Partial<OptionGroupRow>) => setOptionGroups((current) => current.map((group) => group.id === id ? { ...group, ...patch } : group));
+  const updateOption = (groupId: string, optionId: string, patch: { name?: string; priceAdjustment?: string }) => setOptionGroups((current) => current.map((group) => group.id === groupId ? { ...group, options: group.options.map((option) => option.id === optionId ? { ...option, ...patch } : option) } : group));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +169,7 @@ export function ProductFormModal({
         imageUrl,
         isActive: product?.isActive ?? true,
         variants: variantPayload,
+        optionGroups: optionGroups.map((group) => ({ name: group.name, selectionType: group.selectionType, minSelections: group.selectionType === "required" ? Math.max(1, group.minSelections) : 0, maxSelections: group.selectionType === "multiple" ? Math.max(1, group.maxSelections) : 1, options: group.options.map((option) => ({ name: option.name, priceAdjustment: parseFloat(option.priceAdjustment) || 0 })) })),
         toppings: toppingPayload,
       }, code);
 
@@ -186,6 +193,8 @@ export function ProductFormModal({
           <p className="text-xs text-gray-500">Código: {product.code}</p>
         )}
 
+        <section className="space-y-4 rounded-xl border bg-gray-50 p-4">
+          <h3 className="font-semibold">Datos básicos</h3>
         <div>
           <label className="mb-1 block text-sm font-medium">Nombre</label>
           <input
@@ -247,6 +256,8 @@ export function ProductFormModal({
           value={imageUrl}
           onChange={setImageUrl}
         />
+        <div className="rounded-lg bg-white p-3 text-sm shadow-sm"><span className="font-medium">Vista previa:</span> {name || "Nombre del producto"} · <span className="text-brand-green">{formatCurrency(parseFloat(price) || 0)}</span>{description && <p className="mt-1 text-xs text-gray-500">{description}</p>}</div>
+        </section>
 
         <div className="flex items-center gap-2 py-2">
           <input 
@@ -258,18 +269,7 @@ export function ProductFormModal({
           <label htmlFor="hasVariants" className="text-sm font-medium">Este producto tiene múltiples variantes (ej: Tamaños, Combinaciones)</label>
         </div>
 
-        {!hasVariants ? (
-          <div>
-            <label className="mb-1 block text-sm font-medium">Precio de venta</label>
-            <input
-              required={!hasVariants}
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-            />
-          </div>
-        ) : (
+        {hasVariants && (
           <div className="rounded-lg border border-gray-200 p-4 space-y-3">
             <div className="flex justify-between items-center">
               <label className="text-sm font-semibold">Variantes del Producto</label>
@@ -303,7 +303,9 @@ export function ProductFormModal({
           </div>
         )}
 
-        <div>
+        <section className="space-y-3 rounded-xl border p-4"><div className="flex items-center justify-between"><div><h3 className="font-semibold">Grupos de opciones</h3><p className="text-xs text-gray-500">Ej.: Tamaño, Tipo de tortilla o Salsa.</p></div><Button type="button" variant="outline" size="sm" onClick={addOptionGroup}><Plus className="mr-1 h-3 w-3" />Grupo</Button></div>{optionGroups.map((group) => <div key={group.id} className="space-y-2 rounded-lg bg-gray-50 p-3"><div className="grid gap-2 sm:grid-cols-3"><input value={group.name} onChange={(e) => updateOptionGroup(group.id, { name: e.target.value })} placeholder="Ej.: Tamaño" className="rounded border px-2 py-1.5 text-sm" /><select value={group.selectionType} onChange={(e) => updateOptionGroup(group.id, { selectionType: e.target.value as OptionGroupRow["selectionType"] })} className="rounded border px-2 py-1.5 text-sm"><option value="required">Una obligatoria</option><option value="optional">Una opcional</option><option value="multiple">Varias opciones</option></select>{group.selectionType === "multiple" && <input type="number" min="1" value={group.maxSelections} onChange={(e) => updateOptionGroup(group.id, { maxSelections: Number(e.target.value) || 1 })} className="rounded border px-2 py-1.5 text-sm" />}</div>{group.options.map((option) => <div key={option.id} className="flex gap-2"><input value={option.name} onChange={(e) => updateOption(group.id, option.id, { name: e.target.value })} placeholder="Ej.: Grande" className="flex-1 rounded border px-2 py-1.5 text-sm" /><input type="number" step="0.01" value={option.priceAdjustment} onChange={(e) => updateOption(group.id, option.id, { priceAdjustment: e.target.value })} placeholder="Extra" className="w-24 rounded border px-2 py-1.5 text-sm" /></div>)}<button type="button" className="text-xs text-brand-blue" onClick={() => updateOptionGroup(group.id, { options: [...group.options, { id: crypto.randomUUID(), name: "", priceAdjustment: "0" }] })}>+ Agregar opción</button></div>)}</section>
+
+        <section className="rounded-xl border p-4">
           <label className="mb-2 block text-sm font-semibold">Toppings</label>
           <div className="flex gap-2">
             <input
@@ -371,7 +373,7 @@ export function ProductFormModal({
               </li>
             ))}
           </ul>
-        </div>
+        </section>
 
         <div className="flex gap-2 pt-2">
           <Button type="button" variant="outline" fullWidth onClick={onClose}>
