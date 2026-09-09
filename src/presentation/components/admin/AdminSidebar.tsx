@@ -50,7 +50,7 @@ export function AdminSidebar() {
       >
         {open ? "≡ Menú" : "≡"}
       </button>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-2">
+      <nav className="flex-1 space-y-1 overflow-visible p-2">
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -67,7 +67,7 @@ export function AdminSidebar() {
           >
             <Icon className="h-5 w-5 shrink-0" />
             {open && <span>{label}</span>}
-            {!open && <span role="tooltip" className="pointer-events-none absolute left-full z-50 ml-3 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg md:block md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-focus:opacity-100">{label}</span>}
+            {!open && <span role="tooltip" className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg group-hover:block group-focus:block">{label}</span>}
           </Link>
         ))}
         {isSystemAdmin && (
@@ -79,7 +79,7 @@ export function AdminSidebar() {
           >
             <Shield className="h-5 w-5 shrink-0" />
             {open && <span>Super Admin</span>}
-            {!open && <span role="tooltip" className="pointer-events-none absolute left-full z-50 ml-3 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg md:block md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-focus:opacity-100">Super Admin</span>}
+            {!open && <span role="tooltip" className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg group-hover:block group-focus:block">Super Admin</span>}
           </Link>
         )}
       </nav>
